@@ -1,0 +1,117 @@
+import numpy as np 
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import roc_curve
+from sklearn.metrics import roc_auc_score
+from sklearn.metrics import auc
+import keras
+import tensorflow as tf
+from keras import backend as K
+from keras import metrics
+from keras.regularizers import l2
+from keras.models import Sequential
+from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization, InputLayer, Activation
+from keras.preprocessing.image import ImageDataGenerator
+from keras.metrics import AUC
+from keras.optimizers import Adam
+from keras.callbacks import EarlyStopping
+from sklearn.metrics import classification_report, confusion_matrix
+
+# Set a seed value
+seed_value= 42
+
+# 1. Set `PYTHONHASHSEED` environment variable at a fixed value
+import os
+os.environ['PYTHONHASHSEED']=str(seed_value)
+
+# 2. Set `python` built-in pseudo-random generator at a fixed value
+import random
+random.seed(seed_value)
+
+# 3. Set `numpy` pseudo-random generator at a fixed value
+np.random.seed(seed_value)
+
+# 4. Set `tensorflow` pseudo-random generator at a fixed value
+tf.set_random_seed(seed_value)
+
+# 5. For layers that introduce randomness like dropout, make sure to set seed values 
+#model.add(Dropout(0.25, seed=seed_value))
+
+#6 Configure a new global `tensorflow` session
+session_conf = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
+sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
+K.set_session(sess)
+
+## Set file paths to image files
+project_path = "/Users/abukar/DeepLearning_CNN_Project/"
+train_path = project_path + "/chest_xray_classification/train/"
+val_path = project_path + "/chest_xray_classification/val/"
+test_path = project_path + "/chest_xray_classification/test/"
+
+## Set up hyperparameters that will be used later
+hyper_dimension = 64
+hyper_batch_size = 128
+hyper_epochs = 100
+hyper_channels = 1
+hyper_mode = 'grayscale'
+
+## Generate batches of image data (train, validation, and test) with data augmentation
+train_datagen = ImageDataGenerator(rescale=1.0/255.0, 
+                                   shear_range = 0.2,
+                                   zoom_range = 0.2, 
+                                   horizontal_flip = True)
+val_datagen = ImageDataGenerator(rescale=1.0/255.0) 
+test_datagen = ImageDataGenerator(rescale=1.0/255.0) 
+
+
+train_generator = train_datagen.flow_from_directory(directory = train_path, 
+                                                    target_size = (hyper_dimension, hyper_dimension),
+                                                    batch_size = hyper_batch_size, 
+                                                    color_mode = hyper_mode,
+                                                    class_mode = 'binary', 
+                                                    seed = 42)
+val_generator = val_datagen.flow_from_directory(directory = val_path, 
+                                                 target_size = (hyper_dimension, hyper_dimension),
+                                                 batch_size = hyper_batch_size, 
+                                                 class_mode = 'binary',
+                                                 color_mode = hyper_mode,
+                                                 shuffle=False,
+                                                 seed = 42)
+test_generator = test_datagen.flow_from_directory(directory = test_path, 
+                                                 target_size = (hyper_dimension, hyper_dimension),
+                                                 batch_size = hyper_batch_size, 
+                                                 class_mode = 'binary',
+                                                 color_mode = hyper_mode,
+                                                 shuffle=False,
+                                                 seed = 42)
+
+test_generator.reset()
+
+cnn = Sequential()
+cnn.add(InputLayer(input_shape=(hyper_dimension, hyper_dimension, hyper_channels)))
+
+cnn.add(Conv2D(filters=32, kernel_size=3, activation='relu'))
+cnn.add(MaxPooling2D(pool_size=(2,2)))
+
+cnn.add(Conv2D(filters=32, kernel_size=3, activation='relu'))
+cnn.add(MaxPooling2D(pool_size=(2,2)))
+
+cnn.add(Conv2D(filters=32, kernel_size=3, activation='relu'))
+cnn.add(MaxPooling2D(pool_size=(2,2)))
+
+cnn.add(Flatten())
+
+cnn.add(Dense(activation='relu', units=128))
+cnn.add(Dense(activation='sigmoid', units=1))
+
+cnn.compile(optimizer= 'adam', loss='binary_crossentropy', metrics=[AUC()])
+cnn_model = cnn.fit_generator(train_generator, 
+                              steps_per_epoch = len(train_generator), 
+                              epochs = 200, 
+                              validation_data = val_generator,
+                              validation_steps = len(val_generator), 
+                              verbose=2)
+                              
+                             
